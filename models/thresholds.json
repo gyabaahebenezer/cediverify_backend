@@ -1,0 +1,119 @@
+{
+  "100_Cedi_note": {
+    "class_name": "100_Cedi_note",
+    "num_images": 284,
+    "best_val_loss": 0.0026876928085195167,
+    "mean_reconstruction_error": 0.002971036573095868,
+    "std_reconstruction_error": 0.0009922165865203657,
+    "threshold": 0.004955469746136599,
+    "model_path": "models\\100_Cedi_note_autoencoder.pth"
+  },
+  "10_Cedi_note": {
+    "class_name": "10_Cedi_note",
+    "num_images": 207,
+    "best_val_loss": 0.0018890159459964884,
+    "mean_reconstruction_error": 0.0016885643577082983,
+    "std_reconstruction_error": 0.0006452392378072977,
+    "threshold": 0.0029790428333228937,
+    "model_path": "models\\10_Cedi_note_autoencoder.pth"
+  },
+  "10_pesewas_coin": {
+    "class_name": "10_pesewas_coin",
+    "num_images": 271,
+    "best_val_loss": 0.000384748843498528,
+    "mean_reconstruction_error": 0.0004488486534683034,
+    "std_reconstruction_error": 0.0003413999702179583,
+    "threshold": 0.00113164859390422,
+    "model_path": "models\\10_pesewas_coin_autoencoder.pth"
+  },
+  "1_Cedi_coin": {
+    "class_name": "1_Cedi_coin",
+    "num_images": 200,
+    "best_val_loss": 0.0006816048252706726,
+    "mean_reconstruction_error": 0.0008420032264742379,
+    "std_reconstruction_error": 0.0017800776687221962,
+    "threshold": 0.00440215856391863,
+    "model_path": "models\\1_Cedi_coin_autoencoder.pth"
+  },
+  "1_Cedi_note": {
+    "class_name": "1_Cedi_note",
+    "num_images": 258,
+    "best_val_loss": 0.0018718526576106485,
+    "mean_reconstruction_error": 0.002140719795869173,
+    "std_reconstruction_error": 0.0008092472288455169,
+    "threshold": 0.003759214253560207,
+    "model_path": "models\\1_Cedi_note_autoencoder.pth"
+  },
+  "200_Cedi_note": {
+    "class_name": "200_Cedi_note",
+    "num_images": 251,
+    "best_val_loss": 0.002385669608122191,
+    "mean_reconstruction_error": 0.002654424643559331,
+    "std_reconstruction_error": 0.0014320316210947941,
+    "threshold": 0.005518487885748919,
+    "model_path": "models\\200_Cedi_note_autoencoder.pth"
+  },
+  "20_Cedi_note": {
+    "class_name": "20_Cedi_note",
+    "num_images": 169,
+    "best_val_loss": 0.0017837712541222573,
+    "mean_reconstruction_error": 0.0016486281412653625,
+    "std_reconstruction_error": 0.0007344709784823499,
+    "threshold": 0.003117570098230062,
+    "model_path": "models\\20_Cedi_note_autoencoder.pth"
+  },
+  "20_pesewas_coin": {
+    "class_name": "20_pesewas_coin",
+    "num_images": 199,
+    "best_val_loss": 0.0018338896454600938,
+    "mean_reconstruction_error": 0.0020529728499241173,
+    "std_reconstruction_error": 0.0010507751444446213,
+    "threshold": 0.00415452313881336,
+    "model_path": "models\\20_pesewas_coin_autoencoder.pth"
+  },
+  "2_Cedi_coin": {
+    "class_name": "2_Cedi_coin",
+    "num_images": 218,
+    "best_val_loss": 0.001820384815800935,
+    "mean_reconstruction_error": 0.0019011174317711266,
+    "std_reconstruction_error": 0.001152194194448128,
+    "threshold": 0.004205505820667383,
+    "model_path": "models\\2_Cedi_coin_autoencoder.pth"
+  },
+  "2_Cedi_note": {
+    "class_name": "2_Cedi_note",
+    "num_images": 168,
+    "best_val_loss": 0.0023268353193998336,
+    "mean_reconstruction_error": 0.002398393410257995,
+    "std_reconstruction_error": 0.0011001473388692153,
+    "threshold": 0.004598688087996426,
+    "model_path": "models\\2_Cedi_note_autoencoder.pth"
+  },
+  "50_Cedi_note": {
+    "class_name": "50_Cedi_note",
+    "num_images": 103,
+    "best_val_loss": 0.0027093756943941116,
+    "mean_reconstruction_error": 0.0025568939046934245,
+    "std_reconstruction_error": 0.0006862736177456238,
+    "threshold": 0.003929441140184672,
+    "model_path": "models\\50_Cedi_note_autoencoder.pth"
+  },
+  "50_pesewas_coin": {
+    "class_name": "50_pesewas_coin",
+    "num_images": 267,
+    "best_val_loss": 0.0008238224545493722,
+    "mean_reconstruction_error": 0.00080168130389211,
+    "std_reconstruction_error": 0.0007436420464893911,
+    "threshold": 0.002288965396870892,
+    "model_path": "models\\50_pesewas_coin_autoencoder.pth"
+  },
+  "5_Cedi_note": {
+    "class_name": "5_Cedi_note",
+    "num_images": 310,
+    "best_val_loss": 0.0007487443913503186,
+    "mean_reconstruction_error": 0.0007539956334411451,
+    "std_reconstruction_error": 0.00047879957335763846,
+    "threshold": 0.001711594780156422,
+    "model_path": "models\\5_Cedi_note_autoencoder.pth"
+  }
+}

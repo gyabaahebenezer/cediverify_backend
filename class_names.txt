@@ -1,0 +1,14 @@
+100_Cedi_note
+10_Cedi_note
+10_pesewas_coin
+1_Cedi_coin
+1_Cedi_note
+200_Cedi_note
+20_Cedi_note
+20_pesewas_coin
+2_Cedi_coin
+2_Cedi_note
+50_Cedi_note
+50_pesewas_coin
+5_Cedi_note
+_other
