@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+
 import torch
 from torch import nn
 from torchvision import transforms
@@ -6,6 +8,8 @@ from torchvision.models import mobilenet_v2
 from PIL import Image
 
 from model import CurrencyAutoencoder
+
+BASE_DIR = Path(__file__).resolve().parent
 
 device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
 
@@ -37,28 +41,44 @@ DENOMINATION_CONFIDENCE_FLOOR = 0.85
 
 class CurrencyVerifier:
     def __init__(self,
-                 denom_model_path="denomination_classifier.pth",
-                 class_names_path="class_names.txt",
-                 thresholds_path="models/thresholds.json",
-                 autoencoder_dir="models"):
+                 denom_model_path=None,
+                 class_names_path=None,
+                 thresholds_path=None,
+                 autoencoder_dir=None):
+
+        if denom_model_path is None:
+            denom_model_path = BASE_DIR / "denomination_classifier.pth"
+        if class_names_path is None:
+            class_names_path = BASE_DIR / "class_names.txt"
+        if thresholds_path is None:
+            thresholds_path = BASE_DIR / "models" / "thresholds.json"
+        if autoencoder_dir is None:
+            autoencoder_dir = BASE_DIR / "models"
+
+        self.base_dir = BASE_DIR
+        self.autoencoder_dir = Path(autoencoder_dir)
 
         # --- Stage 1: denomination classifier ---
-        with open(class_names_path) as f:
+        with open(class_names_path, encoding="utf-8") as f:
             self.class_names = [line.strip() for line in f if line.strip()]
 
         self.denom_model = mobilenet_v2(weights=None)
         self.denom_model.classifier[1] = nn.Linear(
             self.denom_model.last_channel, len(self.class_names)
         )
-        self.denom_model.load_state_dict(torch.load(denom_model_path, map_location=device))
+        self.denom_model.load_state_dict(torch.load(str(denom_model_path), map_location=device))
         self.denom_model.to(device).eval()
 
         # --- Stage 2: per-class autoencoders + thresholds ---
-        with open(thresholds_path) as f:
+        with open(thresholds_path, encoding="utf-8") as f:
             self.stats = json.load(f)   # class_name -> {threshold, model_path, ...}
 
+        for entry in self.stats.values():
+            if "model_path" in entry:
+                normalized = str(entry["model_path"]).replace("\\", "/")
+                entry["model_path"] = str((self.base_dir / Path(normalized)).resolve())
+
         self.autoencoders = {}          # lazy-loaded on first use
-        self.autoencoder_dir = autoencoder_dir
 
     def _load_autoencoder(self, class_name):
         if class_name not in self.autoencoders:
