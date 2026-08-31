@@ -37,6 +37,7 @@ autoencoder_transform = transforms.Compose([
 # run Stage 2 against it -- return "not recognized" instead. Tune this
 # against your own validation images; 0.85 is a reasonable starting point.
 DENOMINATION_CONFIDENCE_FLOOR = 0.85
+NON_CURRENCY_BUCKETS = {"_other", "other", "others", "unknown"}
 
 
 class CurrencyVerifier:
@@ -89,6 +90,22 @@ class CurrencyVerifier:
             self.autoencoders[class_name] = model
         return self.autoencoders[class_name]
 
+    @staticmethod
+    def _normalize_class_name(class_name):
+        return str(class_name).strip()
+
+    def is_supported_class(self, class_name):
+        normalized = self._normalize_class_name(class_name)
+        return normalized not in NON_CURRENCY_BUCKETS and normalized in self.stats
+
+    def should_continue_with_prediction(self, class_name, confidence):
+        normalized = self._normalize_class_name(class_name)
+        if normalized in NON_CURRENCY_BUCKETS:
+            return False
+        if confidence < DENOMINATION_CONFIDENCE_FLOOR:
+            return False
+        return True
+
     def preload_all(self):
         """Optional: load every autoencoder up front (e.g. at app startup)
         instead of on first request, so first-use latency doesn't spike."""
@@ -104,22 +121,30 @@ class CurrencyVerifier:
         logits = self.denom_model(classifier_tensor)
         probs = torch.softmax(logits, dim=1)
         pred_idx = probs.argmax(dim=1).item()
-        denom_confidence = probs[0, pred_idx].item()
+        denom_confidence = float(probs[0, pred_idx].item())
         predicted_class = self.class_names[pred_idx]
 
-        # if denom_confidence < DENOMINATION_CONFIDENCE_FLOOR:
-        #     return {
-        #         "predicted_class": predicted_class,
-        #         "denomination_confidence": round(denom_confidence, 3),
-        #         "verdict": "not recognized",
-        #         "reason": (
-        #             f"Confidence {denom_confidence:.2f} is below the "
-        #             f"{DENOMINATION_CONFIDENCE_FLOOR} floor -- likely not a "
-        #             "currency image, or an unclear/unsupported photo."
-        #         ),
-        #     }
+        if self._normalize_class_name(predicted_class) in NON_CURRENCY_BUCKETS:
+            return {
+                "predicted_class": predicted_class,
+                "denomination_confidence": round(denom_confidence, 4),
+                "verdict": "not recognized",
+                "reason": "The classifier matched a non-currency bucket instead of a supported denomination.",
+            }
 
-        if predicted_class not in self.stats:
+        if not self.should_continue_with_prediction(predicted_class, denom_confidence):
+            return {
+                "predicted_class": predicted_class,
+                "denomination_confidence": round(denom_confidence, 3),
+                "verdict": "not recognized",
+                "reason": (
+                    f"Confidence {denom_confidence:.2f} is below the "
+                    f"{DENOMINATION_CONFIDENCE_FLOOR} floor -- likely not a "
+                    "currency image, or an unclear/unsupported photo."
+                ),
+            }
+
+        if not self.is_supported_class(predicted_class):
             return {
                 "predicted_class": predicted_class,
                 "denomination_confidence": round(denom_confidence, 4),
@@ -135,7 +160,6 @@ class CurrencyVerifier:
         threshold = self.stats[predicted_class]["threshold"]
 
         is_genuine = error <= threshold
-        # how far past/under the threshold, as a rough confidence signal
         margin = (threshold - error) / threshold if threshold > 0 else 0.0
 
         return {
