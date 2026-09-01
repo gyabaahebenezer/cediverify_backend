@@ -1,6 +1,6 @@
 import json
+import os
 import torch
-from pathlib import Path
 from torch import nn
 from torchvision import transforms
 from torchvision.models import mobilenet_v2
@@ -43,12 +43,6 @@ class CurrencyVerifier:
                  thresholds_path="models/thresholds.json",
                  autoencoder_dir="models"):
 
-        # Convert all paths to Path objects for cross-platform compatibility
-        denom_model_path = Path(denom_model_path)
-        class_names_path = Path(class_names_path)
-        thresholds_path = Path(thresholds_path)
-        autoencoder_dir = Path(autoencoder_dir)
-
         # --- Stage 1: denomination classifier ---
         with open(class_names_path) as f:
             self.class_names = [line.strip() for line in f if line.strip()]
@@ -57,19 +51,12 @@ class CurrencyVerifier:
         self.denom_model.classifier[1] = nn.Linear(
             self.denom_model.last_channel, len(self.class_names)
         )
-        self.denom_model.load_state_dict(torch.load(str(denom_model_path), map_location=device))
+        self.denom_model.load_state_dict(torch.load(denom_model_path, map_location=device))
         self.denom_model.to(device).eval()
 
         # --- Stage 2: per-class autoencoders + thresholds ---
         with open(thresholds_path) as f:
             self.stats = json.load(f)   # class_name -> {threshold, model_path, ...}
-
-        # Normalize model paths in stats to use forward slashes
-        for class_name in self.stats:
-            if "model_path" in self.stats[class_name]:
-                self.stats[class_name]["model_path"] = Path(
-                    self.stats[class_name]["model_path"]
-                ).as_posix()
 
         self.autoencoders = {}          # lazy-loaded on first use
         self.autoencoder_dir = autoencoder_dir
@@ -77,8 +64,14 @@ class CurrencyVerifier:
     def _load_autoencoder(self, class_name):
         if class_name not in self.autoencoders:
             model = CurrencyAutoencoder().to(device)
-            model_path = Path(self.stats[class_name]["model_path"])
-            state = torch.load(str(model_path), map_location=device)
+            # Reconstruct the path from the known naming convention rather
+            # than trusting the "model_path" field in thresholds.json --
+            # that field was written using whatever OS ran training (e.g.
+            # Windows backslashes), which breaks when this JSON is deployed
+            # to a Linux server. os.path.join here uses the *server's* path
+            # rules, so this works regardless of the training machine's OS.
+            model_path = os.path.join(self.autoencoder_dir, f"{class_name}_autoencoder.pth")
+            state = torch.load(model_path, map_location=device)
             model.load_state_dict(state)
             model.eval()
             self.autoencoders[class_name] = model
