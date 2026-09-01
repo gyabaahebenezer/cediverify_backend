@@ -1,15 +1,11 @@
 import json
-from pathlib import Path
-
 import torch
 from torch import nn
 from torchvision import transforms
 from torchvision.models import mobilenet_v2
-from PIL import Image
+from PIL import Image, ImageOps
 
 from model import CurrencyAutoencoder
-
-BASE_DIR = Path(__file__).resolve().parent
 
 device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
 
@@ -37,49 +33,32 @@ autoencoder_transform = transforms.Compose([
 # run Stage 2 against it -- return "not recognized" instead. Tune this
 # against your own validation images; 0.85 is a reasonable starting point.
 DENOMINATION_CONFIDENCE_FLOOR = 0.85
-NON_CURRENCY_BUCKETS = {"_other", "other", "others", "unknown"}
 
 
 class CurrencyVerifier:
     def __init__(self,
-                 denom_model_path=None,
-                 class_names_path=None,
-                 thresholds_path=None,
-                 autoencoder_dir=None):
-
-        if denom_model_path is None:
-            denom_model_path = BASE_DIR / "denomination_classifier.pth"
-        if class_names_path is None:
-            class_names_path = BASE_DIR / "class_names.txt"
-        if thresholds_path is None:
-            thresholds_path = BASE_DIR / "models" / "thresholds.json"
-        if autoencoder_dir is None:
-            autoencoder_dir = BASE_DIR / "models"
-
-        self.base_dir = BASE_DIR
-        self.autoencoder_dir = Path(autoencoder_dir)
+                 denom_model_path="denomination_classifier.pth",
+                 class_names_path="class_names.txt",
+                 thresholds_path="models/thresholds.json",
+                 autoencoder_dir="models"):
 
         # --- Stage 1: denomination classifier ---
-        with open(class_names_path, encoding="utf-8") as f:
+        with open(class_names_path) as f:
             self.class_names = [line.strip() for line in f if line.strip()]
 
         self.denom_model = mobilenet_v2(weights=None)
         self.denom_model.classifier[1] = nn.Linear(
             self.denom_model.last_channel, len(self.class_names)
         )
-        self.denom_model.load_state_dict(torch.load(str(denom_model_path), map_location=device))
+        self.denom_model.load_state_dict(torch.load(denom_model_path, map_location=device))
         self.denom_model.to(device).eval()
 
         # --- Stage 2: per-class autoencoders + thresholds ---
-        with open(thresholds_path, encoding="utf-8") as f:
+        with open(thresholds_path) as f:
             self.stats = json.load(f)   # class_name -> {threshold, model_path, ...}
 
-        for entry in self.stats.values():
-            if "model_path" in entry:
-                normalized = str(entry["model_path"]).replace("\\", "/")
-                entry["model_path"] = str((self.base_dir / Path(normalized)).resolve())
-
         self.autoencoders = {}          # lazy-loaded on first use
+        self.autoencoder_dir = autoencoder_dir
 
     def _load_autoencoder(self, class_name):
         if class_name not in self.autoencoders:
@@ -90,22 +69,6 @@ class CurrencyVerifier:
             self.autoencoders[class_name] = model
         return self.autoencoders[class_name]
 
-    @staticmethod
-    def _normalize_class_name(class_name):
-        return str(class_name).strip()
-
-    def is_supported_class(self, class_name):
-        normalized = self._normalize_class_name(class_name)
-        return normalized not in NON_CURRENCY_BUCKETS and normalized in self.stats
-
-    def should_continue_with_prediction(self, class_name, confidence):
-        normalized = self._normalize_class_name(class_name)
-        if normalized in NON_CURRENCY_BUCKETS:
-            return False
-        if confidence < DENOMINATION_CONFIDENCE_FLOOR:
-            return False
-        return True
-
     def preload_all(self):
         """Optional: load every autoencoder up front (e.g. at app startup)
         instead of on first request, so first-use latency doesn't spike."""
@@ -114,37 +77,36 @@ class CurrencyVerifier:
 
     @torch.no_grad()
     def verify(self, image_path):
-        image = Image.open(image_path).convert("RGB")
+        image = Image.open(image_path)
+        original_size = image.size  # (width, height) before any correction -- useful for debugging
+        had_exif_orientation = image.getexif().get(0x0112, 1) != 1  # 0x0112 = Orientation tag
+
+        image = ImageOps.exif_transpose(image)   # rotate/flip based on EXIF, THEN treat as canonical
+        image = image.convert("RGB")
 
         # Stage 1: what is it?
         classifier_tensor = classifier_transform(image).unsqueeze(0).to(device)
         logits = self.denom_model(classifier_tensor)
         probs = torch.softmax(logits, dim=1)
         pred_idx = probs.argmax(dim=1).item()
-        denom_confidence = float(probs[0, pred_idx].item())
+        denom_confidence = probs[0, pred_idx].item()
         predicted_class = self.class_names[pred_idx]
 
-        if self._normalize_class_name(predicted_class) in NON_CURRENCY_BUCKETS:
+        if denom_confidence < DENOMINATION_CONFIDENCE_FLOOR:
             return {
                 "predicted_class": predicted_class,
                 "denomination_confidence": round(denom_confidence, 4),
-                "verdict": "not recognized",
-                "reason": "The classifier matched a non-currency bucket instead of a supported denomination.",
-            }
-
-        if not self.should_continue_with_prediction(predicted_class, denom_confidence):
-            return {
-                "predicted_class": predicted_class,
-                "denomination_confidence": round(denom_confidence, 3),
                 "verdict": "not recognized",
                 "reason": (
                     f"Confidence {denom_confidence:.2f} is below the "
                     f"{DENOMINATION_CONFIDENCE_FLOOR} floor -- likely not a "
                     "currency image, or an unclear/unsupported photo."
                 ),
+                "debug_original_size": original_size,
+                "debug_had_exif_orientation": had_exif_orientation,
             }
 
-        if not self.is_supported_class(predicted_class):
+        if predicted_class not in self.stats:
             return {
                 "predicted_class": predicted_class,
                 "denomination_confidence": round(denom_confidence, 4),
@@ -160,6 +122,7 @@ class CurrencyVerifier:
         threshold = self.stats[predicted_class]["threshold"]
 
         is_genuine = error <= threshold
+        # how far past/under the threshold, as a rough confidence signal
         margin = (threshold - error) / threshold if threshold > 0 else 0.0
 
         return {
@@ -169,6 +132,8 @@ class CurrencyVerifier:
             "threshold": round(threshold, 6),
             "verdict": "likely genuine" if is_genuine else "flagged - inspect further",
             "margin": round(margin, 4),
+            "debug_original_size": original_size,
+            "debug_had_exif_orientation": had_exif_orientation,
         }
 
 
