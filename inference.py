@@ -114,12 +114,27 @@ class CurrencyVerifier:
                 "debug_had_exif_orientation": had_exif_orientation,
             }
 
+        if predicted_class == "_other":
+            return {
+                "predicted_class": predicted_class,
+                "denomination_confidence": round(denom_confidence, 4),
+                "verdict": "not_currency",
+                "reason": "This doesn't appear to be currency.",
+                "debug_original_size": original_size,
+                "debug_had_exif_orientation": had_exif_orientation,
+            }
+
         if predicted_class not in self.stats:
             return {
                 "predicted_class": predicted_class,
                 "denomination_confidence": round(denom_confidence, 4),
-                "verdict": "unknown",
-                "reason": f"No trained authenticity model for '{predicted_class}' yet",
+                "verdict": "unsupported_denomination",
+                "reason": (
+                    f"Recognized as '{predicted_class}', but authenticity "
+                    "checking isn't available for this denomination yet."
+                ),
+                "debug_original_size": original_size,
+                "debug_had_exif_orientation": had_exif_orientation,
             }
 
         # Stage 2: does it look genuine for that class?
