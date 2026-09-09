@@ -32,8 +32,8 @@ autoencoder_transform = transforms.Compose([
 
 # Below this denomination confidence, don't trust Stage 1's guess enough to
 # run Stage 2 against it -- return "not recognized" instead. Tune this
-# against your own validation images; 0.85 is a reasonable starting point.
-DENOMINATION_CONFIDENCE_FLOOR = 0.85
+# against your own validation images; 0.70 is a reasonable starting point.
+DENOMINATION_CONFIDENCE_FLOOR = 0.70
 
 
 class CurrencyVerifier:
